@@ -7,7 +7,12 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 
-import pandas as pd
+try:
+    import pandas as pd
+    _PANDAS = True
+except ImportError:
+    _PANDAS = False
+
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -39,6 +44,9 @@ def predict_stockout(item_id: int) -> dict:
     if not transactions:
         logger.debug('No transactions for item %s — skipping forecast', item_id)
         return {'status': 'insufficient_data'}
+
+    if not _PANDAS:
+        return {'status': 'pandas_not_available'}
 
     df = pd.DataFrame(transactions)
     df['created_at'] = pd.to_datetime(df['created_at'], utc=True)

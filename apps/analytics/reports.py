@@ -4,9 +4,14 @@ All financial figures in IDR (integer Decimals).
 """
 from __future__ import annotations
 import logging
-from datetime import date
+from datetime import date, timedelta
 
-import pandas as pd
+try:
+    import pandas as pd
+    _PANDAS = True
+except ImportError:
+    _PANDAS = False
+
 from django.db.models import Sum, Count, Avg
 
 logger = logging.getLogger(__name__)
@@ -34,6 +39,24 @@ def revenue_report(branch_id: int, date_from: date, date_to: date) -> dict:
             'avg_invoice_value': 0,
             'by_day': {},
             'by_payment_method': {},
+        }
+
+    if not _PANDAS:
+        # Fallback: pure Python aggregation when pandas not installed
+        total = sum(float(i['total_amount']) for i in invoices)
+        by_day: dict = {}
+        by_method: dict = {}
+        for inv in invoices:
+            day = str(inv['paid_at'].date() if hasattr(inv['paid_at'], 'date') else inv['paid_at'])
+            by_day[day] = by_day.get(day, 0) + int(float(inv['total_amount']))
+            m = inv['payment_method']
+            by_method[m] = by_method.get(m, 0) + int(float(inv['total_amount']))
+        return {
+            'total_revenue': int(total),
+            'transaction_count': len(invoices),
+            'avg_invoice_value': int(total / len(invoices)),
+            'by_day': by_day,
+            'by_payment_method': by_method,
         }
 
     df = pd.DataFrame(invoices)
@@ -87,7 +110,7 @@ def dashboard_stats(branch_id: int) -> dict:
 
     vaccs_due_soon = VaccinationRecord.objects.filter(
         patient__owner__branch_id=branch_id,
-        next_due_date__range=[today, today + pd.Timedelta(days=30)],
+        next_due_date__range=[today, today + timedelta(days=30)],
         reminder_sent=False,
     ).count()
 
