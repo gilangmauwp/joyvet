@@ -1,0 +1,44 @@
+# ──────────────────────────────────────────────
+# JoyVet Care — PythonAnywhere slim requirements
+# Strips heavy analytics libs (pandas/numpy/matplotlib/plotly)
+# to stay within the 512MB free-tier disk quota.
+# ──────────────────────────────────────────────
+
+# Core framework
+Django==5.1.4
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+django-filter==24.3
+django-extensions==3.2.3
+python-decouple==3.8
+
+# Database
+dj-database-url==2.3.0
+
+# Use PythonAnywhere's pre-installed psycopg2 alternative
+# (SQLite is used on free tier, no psycopg2 needed)
+
+# Cache / Message broker (Redis optional on PA free)
+redis==5.2.0
+
+# Task queue (eager mode — no worker needed)
+celery[redis]==5.4.0
+django-celery-beat==2.7.0
+django-celery-results==2.5.1
+
+# ASGI / Real-time
+channels==4.1.0
+daphne==4.1.2
+
+# Auth
+djangorestframework-simplejwt==5.3.1
+
+# Images & QR codes
+Pillow==11.0.0
+qrcode[pil]==8.0
+
+# Static files serving
+whitenoise==6.8.2
+
+# Production server
+gunicorn==23.0.0
