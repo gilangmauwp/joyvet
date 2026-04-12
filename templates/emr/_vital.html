@@ -1,0 +1,7 @@
+<div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-center">
+  <p class="text-xs text-slate-400 uppercase tracking-wide">{{ label }}</p>
+  <p class="text-lg font-bold font-mono text-slate-900 dark:text-white mt-1">
+    {% if value %}{{ value }} <span class="text-xs font-normal text-slate-400">{{ unit }}</span>
+    {% else %}—{% endif %}
+  </p>
+</div>

@@ -1,0 +1,125 @@
+<!--
+  QR Code Scanner component.
+  Uses jsQR to decode patient QR codes via device camera.
+  On success: navigates to the patient page via HTMX.
+-->
+<div x-data="qrScanner()" x-cloak>
+  <!-- Trigger button -->
+  <button
+    @click="open = true; startCamera()"
+    class="flex items-center gap-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-sm font-medium transition-colors"
+  >
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+    </svg>
+    Scan QR
+  </button>
+
+  <!-- Scanner modal -->
+  <div
+    x-show="open"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    @click.self="stopCamera()"
+  >
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+        <h3 class="font-semibold text-slate-900 dark:text-white">Scan Patient QR</h3>
+        <button @click="stopCamera()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Camera viewfinder -->
+      <div class="relative bg-black">
+        <video x-ref="video" autoplay playsinline class="w-full aspect-square object-cover"></video>
+        <!-- Scan guide overlay -->
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-48 h-48 border-2 border-white/70 rounded-2xl relative">
+            <div class="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-primary-400 rounded-tl-xl"></div>
+            <div class="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-primary-400 rounded-tr-xl"></div>
+            <div class="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-primary-400 rounded-bl-xl"></div>
+            <div class="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-primary-400 rounded-br-xl"></div>
+          </div>
+        </div>
+        <!-- Hidden canvas for frame capture -->
+        <canvas x-ref="canvas" class="hidden"></canvas>
+      </div>
+
+      <!-- Status -->
+      <div class="px-5 py-4">
+        <p x-text="status" class="text-sm text-center text-slate-600 dark:text-slate-400"></p>
+        <p x-show="error" x-text="error" class="text-sm text-red-500 text-center mt-1"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function qrScanner() {
+  return {
+    open: false,
+    stream: null,
+    scanning: false,
+    status: 'Point camera at patient QR code',
+    error: '',
+
+    async startCamera() {
+      this.error = '';
+      this.status = 'Starting camera…';
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } },
+        });
+        this.$refs.video.srcObject = this.stream;
+        await this.$refs.video.play();
+        this.status = 'Point camera at patient QR code';
+        this.scanning = true;
+        this.scan();
+      } catch (err) {
+        this.error = 'Camera access denied. Please allow camera permissions.';
+        this.status = '';
+      }
+    },
+
+    scan() {
+      if (!this.scanning) return;
+      const video = this.$refs.video;
+      const canvas = this.$refs.canvas;
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        requestAnimationFrame(() => this.scan());
+        return;
+      }
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' });
+
+      if (code && code.data.startsWith('JOYVET:PATIENT:')) {
+        const parts = code.data.split(':');
+        const patientId = parts[2];
+        this.status = `Found: ${parts[3]} — navigating…`;
+        this.scanning = false;
+        this.stopCamera();
+        // Navigate to patient page via HTMX full-page navigation
+        window.location.href = `/patients/${patientId}/`;
+      } else {
+        requestAnimationFrame(() => this.scan());
+      }
+    },
+
+    stopCamera() {
+      this.scanning = false;
+      if (this.stream) {
+        this.stream.getTracks().forEach(t => t.stop());
+        this.stream = null;
+      }
+      this.open = false;
+    },
+  };
+}
+</script>

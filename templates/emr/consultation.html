@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Consultation — {{ consultation.patient.name }}{% endblock %}
+
+{% block content %}
+<div
+  x-data="consultationRoom({{ consultation.pk }})"
+  x-init="connectWS()"
+  class="space-y-6"
+>
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/patients/{{ consultation.patient.pk }}/"
+         class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+        ← Back
+      </a>
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 dark:text-white">
+          {{ consultation.patient.species_emoji }} {{ consultation.patient.name }}
+        </h1>
+        <div class="flex items-center gap-3 mt-0.5">
+          <span class="text-xs text-slate-500">{{ consultation.visit_date|date:"d M Y, H:i" }} WIB</span>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium
+            {% if consultation.status == 'OPEN' %}bg-blue-100 text-blue-700
+            {% elif consultation.status == 'CLOSED' %}bg-green-100 text-green-700
+            {% else %}bg-slate-100 text-slate-500{% endif %}">
+            {{ consultation.get_status_display }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active editors indicator -->
+    <div class="flex items-center gap-2">
+      <div x-show="editors.length > 0" class="flex items-center gap-1 text-xs text-slate-500">
+        <span class="text-green-500">●</span>
+        <span x-text="editors.join(', ') + ' viewing'"></span>
+      </div>
+      {% if consultation.status == 'OPEN' and can_finalize %}
+      <button
+        hx-post="/api/v1/consultations/{{ consultation.pk }}/finalize/"
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+        hx-confirm="Finalize this record? This action is PERMANENT and cannot be undone."
+        hx-on::after-request="window.location.reload()"
+        class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-xl transition-colors"
+      >
+        ✓ Finalize Record
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Vitals row -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    {% include "emr/_vital.html" with label="Temperature" value=consultation.temperature_celsius unit="°C" %}
+    {% include "emr/_vital.html" with label="Heart Rate" value=consultation.heart_rate_bpm unit="bpm" %}
+    {% include "emr/_vital.html" with label="Resp. Rate" value=consultation.respiratory_rate unit="/min" %}
+    {% include "emr/_vital.html" with label="Weight" value=consultation.weight_kg unit="kg" %}
+    {% include "emr/_vital.html" with label="CRT" value=consultation.capillary_refill_time unit="" %}
+  </div>
+
+  <!-- SOAP Notes -->
+  {% if consultation.status == 'OPEN' %}
+  <form
+    hx-put="/api/v1/consultations/{{ consultation.pk }}/"
+    hx-trigger="change delay:2s"
+    hx-headers='{"X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json"}'
+    class="grid md:grid-cols-2 gap-4"
+  >
+    {% include "emr/_soap_field.html" with field="subjective" label="S — Subjective" help="Owner complaint, history" value=consultation.subjective %}
+    {% include "emr/_soap_field.html" with field="objective" label="O — Objective" help="Physical exam findings" value=consultation.objective %}
+    {% include "emr/_soap_field.html" with field="assessment" label="A — Assessment" help="Diagnosis / differentials" value=consultation.assessment %}
+    {% include "emr/_soap_field.html" with field="plan" label="P — Plan" help="Treatment, prescriptions, follow-up" value=consultation.plan %}
+  </form>
+  {% else %}
+  <!-- Read-only view for CLOSED consultations -->
+  <div class="grid md:grid-cols-2 gap-4">
+    {% for section, content in soap_sections %}
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{{ section }}</h3>
+      <p class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{{ content|default:"—" }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Prescriptions + Attachments tabs -->
+  <div x-data="{ tab: 'rx' }" class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+    <div class="flex border-b border-slate-200 dark:border-slate-700">
+      <button @click="tab='rx'"
+        :class="tab === 'rx' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-slate-500'"
+        class="px-5 py-3.5 text-sm font-medium">
+        💊 Prescriptions ({{ consultation.prescriptions.count }})
+      </button>
+      <button @click="tab='files'"
+        :class="tab === 'files' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-slate-500'"
+        class="px-5 py-3.5 text-sm font-medium">
+        📎 Attachments ({{ consultation.attachments.count }})
+      </button>
+    </div>
+
+    <!-- Prescriptions tab -->
+    <div x-show="tab === 'rx'" class="p-5 space-y-3">
+      {% for rx in consultation.prescriptions.all %}
+      <div class="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl">
+        <div class="flex-1">
+          <p class="font-medium text-sm text-slate-900 dark:text-white">{{ rx.inventory_item.name }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">{{ rx.dosage }} · {{ rx.frequency }} · {{ rx.duration_days }} days</p>
+          <p class="text-xs text-slate-400 font-mono">Qty: {{ rx.quantity }} {{ rx.inventory_item.unit }}</p>
+        </div>
+        {% if rx.is_controlled_drug %}
+        <span class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-lg font-medium">Controlled</span>
+        {% endif %}
+      </div>
+      {% empty %}
+      <p class="text-sm text-slate-400 py-4 text-center">No prescriptions</p>
+      {% endfor %}
+    </div>
+
+    <!-- Attachments tab -->
+    <div x-show="tab === 'files'" class="p-5">
+      {% if consultation.status == 'OPEN' %}
+      {% include "emr/photo_upload.html" %}
+      {% endif %}
+      <div id="attachments-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
+        {% for att in consultation.attachments.all %}
+        {% include "emr/_attachment_thumb.html" with attachment=att %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+function consultationRoom(pk) {
+  return {
+    ws: null,
+    editors: [],
+    connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/consultation/${pk}/`);
+      this.ws.onmessage = (evt) => {
+        const data = JSON.parse(evt.data);
+        if (data.type === 'editor.joined') this.editors.push(data.user);
+        if (data.type === 'editor.left') this.editors = this.editors.filter(e => e !== data.user);
+        if (data.type === 'consultation.new_attachment') {
+          htmx.ajax('GET', `/emr/consultations/${pk}/`, { target: '#attachments-list', swap: 'innerHTML' });
+        }
+      };
+    },
+  };
+}
+</script>
+{% endblock %}
+{% endblock %}

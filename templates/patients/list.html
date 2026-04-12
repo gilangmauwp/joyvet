@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Patients{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Patients</h1>
+    <a href="/patients/new/"
+       class="flex items-center gap-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-sm font-medium transition-colors">
+      + New Patient
+    </a>
+  </div>
+
+  <!-- Search + filters -->
+  <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+    <div class="flex gap-3">
+      <input
+        type="text"
+        name="q"
+        value="{{ search }}"
+        placeholder="Search name, owner, phone, microchip…"
+        hx-get="/patients/"
+        hx-trigger="keyup changed delay:300ms"
+        hx-target="#patient-table"
+        hx-swap="outerHTML"
+        hx-include="[name='q']"
+        class="flex-1 px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+      {% include "components/qr_scanner.html" %}
+    </div>
+  </div>
+
+  <!-- Patient table (HTMX target) -->
+  {% include "patients/_table.html" %}
+</div>
+{% endblock %}

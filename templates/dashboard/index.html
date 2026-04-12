@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Good morning, {{ user.first_name }} 👋</h1>
+      <p class="text-sm text-slate-500 mt-0.5">{{ today_wib|date:"l, d F Y" }} · {{ user_branch.name }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+      {% include "components/qr_scanner.html" %}
+      <a href="/patients/new/" class="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+        + New Patient
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Today's appointments -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Appointments Today</p>
+      <p class="text-3xl font-bold text-slate-900 dark:text-white mt-2">
+        {{ appointments_today.count }}
+      </p>
+      <p class="text-xs text-slate-500 mt-1">
+        {{ stats.completed_today }} completed · {{ stats.in_progress }} in progress
+      </p>
+    </div>
+
+    <!-- Waiting -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Waiting Room</p>
+      <p class="text-3xl font-bold {% if stats.waiting > 3 %}text-amber-500{% else %}text-slate-900 dark:text-white{% endif %} mt-2">
+        {{ stats.waiting }}
+      </p>
+      <p class="text-xs text-slate-500 mt-1">checked in + booked</p>
+    </div>
+
+    <!-- Revenue today -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Revenue Today</p>
+      <div id="revenue-widget">
+        <p class="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-2">
+          Rp {{ stats.revenue_today|floatformat:0 }}
+        </p>
+      </div>
+      <p class="text-xs text-slate-500 mt-1"
+         hx-get="/dashboard/revenue-widget/"
+         hx-trigger="every 60s"
+         hx-target="#revenue-widget"
+         hx-swap="innerHTML">
+        updates every minute
+      </p>
+    </div>
+
+    <!-- Low stock -->
+    <a href="/inventory/?tab=alerts"
+       class="bg-white dark:bg-slate-800 rounded-2xl border {% if stats.low_stock_count > 0 %}border-amber-300 dark:border-amber-700{% else %}border-slate-200 dark:border-slate-700{% endif %} p-5 block hover:shadow-sm transition-shadow">
+      <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Stock Alerts</p>
+      <p class="text-3xl font-bold {% if stats.low_stock_count > 0 %}text-amber-500{% else %}text-slate-900 dark:text-white{% endif %} mt-2">
+        {{ stats.low_stock_count }}
+      </p>
+      <p class="text-xs text-slate-500 mt-1">items at reorder level</p>
+    </a>
+  </div>
+
+  <!-- Today's queue + quick actions -->
+  <div class="grid lg:grid-cols-3 gap-6">
+
+    <!-- Column 1: Today's queue (live) -->
+    <div class="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+        <h2 class="font-semibold text-slate-900 dark:text-white">Today's Queue</h2>
+        <span class="text-xs text-slate-500">{{ appointments_today.count }} appointments</span>
+      </div>
+
+      <div class="divide-y divide-slate-100 dark:divide-slate-700 overflow-y-auto max-h-[480px]">
+        {% for appt in appointments_today %}
+        <div id="appt-card-{{ appt.pk }}">
+          {% include "appointments/_card.html" with appointment=appt %}
+        </div>
+        {% empty %}
+        <div class="text-center py-16 text-slate-400">
+          <p class="text-4xl mb-3">📋</p>
+          <p class="text-sm">No appointments today</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Walk-in button -->
+      <div class="px-5 py-4 border-t border-slate-200 dark:border-slate-700">
+        <a href="/appointments/new/?type=EMERGENCY"
+           class="flex items-center justify-center gap-2 w-full py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl text-sm font-medium hover:bg-red-100 transition-colors">
+          🚨 Emergency Walk-In
+        </a>
+      </div>
+    </div>
+
+    <!-- Column 3: Clinic pulse -->
+    <div class="space-y-4">
+
+      <!-- Vaccination reminders -->
+      {% if stats.vaccinations_due_soon > 0 %}
+      <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+        <div class="flex items-start gap-3">
+          <span class="text-2xl">💉</span>
+          <div>
+            <p class="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              {{ stats.vaccinations_due_soon }} vaccination{{ stats.vaccinations_due_soon|pluralize }} due
+            </p>
+            <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">within the next 7 days</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Quick links -->
+      <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Quick Actions</h3>
+        <div class="space-y-2">
+          <a href="/patients/" class="flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl text-sm transition-colors">
+            <span>🐾</span> Find Patient
+          </a>
+          <a href="/appointments/new/" class="flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl text-sm transition-colors">
+            <span>📅</span> Book Appointment
+          </a>
+          <a href="/inventory/?tab=alerts" class="flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl text-sm transition-colors">
+            <span>📦</span> Stock Alerts
+          </a>
+          <a href="/billing/" class="flex items-center gap-3 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl text-sm transition-colors">
+            <span>💳</span> Open Invoice
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

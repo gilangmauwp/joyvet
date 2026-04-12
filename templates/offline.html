@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Offline — JoyVet Care</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{font-family:'DM Sans',sans-serif}</style>
+</head>
+<body class="h-full flex items-center justify-center bg-slate-50 p-4">
+  <div class="text-center max-w-sm">
+    <div class="text-6xl mb-6">🌐</div>
+    <h1 class="text-2xl font-bold text-slate-900 mb-2">Server Unreachable</h1>
+    <p class="text-slate-600 mb-6">
+      Cannot connect to the clinic server.<br/>
+      Check that your device is on the clinic WiFi network.
+    </p>
+
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left mb-6">
+      <p class="text-sm font-semibold text-amber-800 mb-2">What you can still do:</p>
+      <ul class="text-sm text-amber-700 space-y-1">
+        <li>✓ View cached patient data (from last sync)</li>
+        <li>✓ Record notes — they'll sync when connected</li>
+        <li>✗ Process payments</li>
+        <li>✗ Finalize medical records</li>
+      </ul>
+    </div>
+
+    <button onclick="window.location.reload()" class="w-full py-3 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-xl transition-colors">
+      Try Again
+    </button>
+    <p class="text-xs text-slate-400 mt-4">
+      Server address: https://192.168.1.100 or https://joyvet.local
+    </p>
+  </div>
+</body>
+</html>

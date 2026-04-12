@@ -1,0 +1,20 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "joyvet.settings.local"
+python_files = ["tests/test_*.py", "*/tests/test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--reuse-db -x -q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["apps", "api", "realtime", "frontend"]
+omit = ["*/migrations/*", "*/tests/*", "*/management/commands/*"]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+
+[tool.flake8]
+max-line-length = 100
+exclude = [".git", "__pycache__", "*/migrations/*", ".venv"]
+ignore = ["E501", "W503"]

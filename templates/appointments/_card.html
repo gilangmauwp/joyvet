@@ -1,0 +1,77 @@
+<!--
+  Appointment queue card — HTMX partial.
+  Swapped in by WebSocket event: htmx.ajax('GET', '/appointments/{id}/card/', '#appt-card-{id}')
+  One-tap status advance: hx-post="/appointments/{id}/status/"
+-->
+<div
+  id="appt-card-{{ appointment.pk }}"
+  class="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+>
+  <!-- Species emoji + patient photo -->
+  <div class="flex-shrink-0 w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-2xl">
+    {{ appointment.patient.species_emoji }}
+  </div>
+
+  <!-- Patient + appointment info -->
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2">
+      <a href="/patients/{{ appointment.patient.pk }}/"
+         class="font-semibold text-slate-900 dark:text-white text-sm hover:text-primary-600 truncate">
+        {{ appointment.patient.name }}
+      </a>
+      <!-- Appointment type badge -->
+      <span class="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium
+        {% if appointment.appointment_type == 'EMERGENCY' %}bg-red-100 text-red-700
+        {% elif appointment.appointment_type == 'SURGERY' %}bg-purple-100 text-purple-700
+        {% elif appointment.appointment_type == 'VACCINE' %}bg-blue-100 text-blue-700
+        {% else %}bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300{% endif %}">
+        {{ appointment.get_appointment_type_display }}
+      </span>
+    </div>
+    <p class="text-xs text-slate-500 mt-0.5 truncate">
+      {{ appointment.patient.owner.full_name }} · Dr. {{ appointment.veterinarian.last_name }}
+    </p>
+    <p class="text-xs text-slate-400 mt-0.5">
+      {% if appointment.reason %}{{ appointment.reason|truncatechars:40 }}{% endif %}
+    </p>
+  </div>
+
+  <!-- Time -->
+  <div class="flex-shrink-0 text-right">
+    <p class="text-sm font-mono font-medium text-slate-700 dark:text-slate-300">
+      {{ appointment.scheduled_at|time:"H:i" }}
+    </p>
+    <p class="text-xs text-slate-400">{{ appointment.duration_minutes }}min</p>
+  </div>
+
+  <!-- Status + action -->
+  <div class="flex-shrink-0 flex flex-col items-end gap-2">
+    <!-- Status pill -->
+    <span class="text-xs px-2.5 py-1 rounded-full font-medium
+      {% if appointment.status == 'COMPLETED' %}bg-green-100 text-green-700
+      {% elif appointment.status == 'IN_PROGRESS' %}bg-orange-100 text-orange-700
+      {% elif appointment.status == 'CHECKED_IN' %}bg-purple-100 text-purple-700
+      {% elif appointment.status == 'CONFIRMED' %}bg-blue-100 text-blue-700
+      {% elif appointment.status == 'NO_SHOW' %}bg-red-100 text-red-700
+      {% elif appointment.status == 'CANCELLED' %}bg-slate-100 text-slate-500
+      {% else %}bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300{% endif %}">
+      {{ appointment.get_status_display }}
+    </span>
+
+    <!-- One-tap advance button -->
+    {% if appointment.status not in "COMPLETED,NO_SHOW,CANCELLED" %}
+    <button
+      hx-post="/appointments/{{ appointment.pk }}/status/"
+      hx-swap="outerHTML"
+      hx-target="#appt-card-{{ appointment.pk }}"
+      hx-confirm=""
+      class="text-xs px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+    >
+      {% if appointment.status == 'BOOKED' or appointment.status == 'CONFIRMED' %}Check In
+      {% elif appointment.status == 'CHECKED_IN' %}Start Visit
+      {% elif appointment.status == 'IN_PROGRESS' %}Complete
+      {% endif %}
+    </button>
+    {% endif %}
+  </div>
+</div>

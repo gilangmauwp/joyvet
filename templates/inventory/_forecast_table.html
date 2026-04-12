@@ -1,0 +1,67 @@
+<div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-slate-200 dark:border-slate-700">
+        <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Item</th>
+        <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Current Stock</th>
+        <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase hidden md:table-cell">Avg Daily</th>
+        <th class="px-5 py-3 text-center text-xs font-semibold text-slate-500 uppercase">Days Left</th>
+        <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase hidden lg:table-cell">Stockout</th>
+        <th class="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Order Qty</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+      {% for item in items %}
+      <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+        <td class="px-5 py-3.5">
+          <p class="font-medium text-slate-900 dark:text-white">{{ item.name }}</p>
+          <p class="text-xs text-slate-400 font-mono">{{ item.sku }}</p>
+        </td>
+        <td class="px-5 py-3.5 text-right font-mono">{{ item.stock_quantity }} {{ item.unit }}</td>
+        <td class="px-5 py-3.5 text-right font-mono hidden md:table-cell text-slate-500">
+          {{ item.avg_daily_consumption }}/day
+        </td>
+        <td class="px-5 py-3.5 text-center">
+          {% if item.days_remaining is not None %}
+          <div class="inline-flex flex-col items-center">
+            <span class="font-bold font-mono
+              {% if item.urgency == 'critical' %}text-red-600
+              {% elif item.urgency == 'warning' %}text-amber-600
+              {% else %}text-green-600{% endif %}">
+              {{ item.days_remaining }}d
+            </span>
+            <!-- Progress bar -->
+            <div class="w-16 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1 overflow-hidden">
+              <div class="h-full rounded-full
+                {% if item.urgency == 'critical' %}bg-red-500
+                {% elif item.urgency == 'warning' %}bg-amber-500
+                {% else %}bg-green-500{% endif %}"
+                style="width: {% if item.days_remaining > 30 %}100{% else %}{{ item.days_remaining|floatformat:0 }}0{% endif %}%">
+              </div>
+            </div>
+          </div>
+          {% else %}—{% endif %}
+        </td>
+        <td class="px-5 py-3.5 hidden lg:table-cell text-slate-500 text-sm">
+          {{ item.predicted_stockout|default:"—" }}
+        </td>
+        <td class="px-5 py-3.5 text-right">
+          {% if item.restock_recommendation %}
+          <div class="flex items-center justify-end gap-2">
+            <span class="font-mono font-medium text-slate-900 dark:text-white">{{ item.restock_recommendation }}</span>
+            <button
+              class="text-xs px-2.5 py-1 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg hover:bg-primary-100 transition-colors"
+              onclick="showToast('Order feature coming soon', 'info')"
+            >Order</button>
+          </div>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-center py-12 text-slate-400">
+        No forecast data yet. Forecasts run nightly at 02:00 WIB.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

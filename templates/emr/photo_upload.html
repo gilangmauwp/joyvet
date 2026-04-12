@@ -1,0 +1,172 @@
+<!--
+  Clinical photo & file upload component.
+  Supports camera capture (mobile) and file picker (desktop).
+  Multi-file selection, preview, and HTMX upload.
+-->
+<div x-data="photoUpload()" id="photo-upload-form">
+  <!-- Tab switcher -->
+  <div class="flex gap-2 mb-4">
+    <button
+      @click="mode = 'camera'"
+      :class="mode === 'camera' ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-600'"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+    >
+      📷 Camera
+    </button>
+    <button
+      @click="mode = 'file'"
+      :class="mode === 'file' ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-600'"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+    >
+      📁 Upload File
+    </button>
+  </div>
+
+  <!-- Camera capture (uses native camera on mobile) -->
+  <div x-show="mode === 'camera'">
+    <input
+      type="file"
+      accept="image/*"
+      capture="environment"
+      multiple
+      @change="addFiles($event, 'camera')"
+      class="hidden"
+      id="camera-input"
+    />
+    <label
+      for="camera-input"
+      class="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-primary-300 dark:border-primary-700 rounded-xl cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+    >
+      <span class="text-4xl">📷</span>
+      <span class="text-sm text-slate-600 dark:text-slate-400 text-center">
+        Tap to open camera or choose photo<br/>
+        <span class="text-xs text-slate-400">JPG, PNG, WebP up to 50MB</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- File picker -->
+  <div x-show="mode === 'file'">
+    <input
+      type="file"
+      accept="image/*,application/pdf,video/mp4"
+      multiple
+      @change="addFiles($event, 'file')"
+      class="hidden"
+      id="file-input"
+    />
+    <label
+      for="file-input"
+      class="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+    >
+      <span class="text-4xl">📁</span>
+      <span class="text-sm text-slate-600 dark:text-slate-400 text-center">
+        Choose files or drag & drop<br/>
+        <span class="text-xs text-slate-400">Images, PDF, Video — up to 50MB each</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- Preview grid -->
+  <div x-show="previews.length > 0" class="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
+    <template x-for="(preview, i) in previews" :key="i">
+      <div class="relative group">
+        <img
+          :src="preview.url"
+          class="w-full aspect-square object-cover rounded-xl border border-slate-200 dark:border-slate-700"
+          :alt="preview.name"
+        />
+        <!-- Remove button -->
+        <button
+          @click="removeFile(i)"
+          class="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        >✕</button>
+        <p class="text-xs text-slate-400 truncate mt-1 px-0.5" x-text="preview.name"></p>
+      </div>
+    </template>
+  </div>
+
+  <!-- Description field -->
+  <div x-show="previews.length > 0" class="mt-3">
+    <input
+      type="text"
+      x-model="description"
+      placeholder="Description (optional)"
+      class="w-full px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 dark:bg-slate-900 rounded-xl text-sm"
+    />
+  </div>
+
+  <!-- Upload button -->
+  <button
+    x-show="previews.length > 0"
+    @click="upload()"
+    :disabled="uploading"
+    class="mt-3 w-full py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition-colors"
+    x-text="uploading ? 'Uploading…' : `Upload ${previews.length} file(s)`"
+  ></button>
+</div>
+
+<script>
+function photoUpload() {
+  return {
+    mode: 'camera',
+    files: [],
+    previews: [],
+    source: 'camera',
+    description: '',
+    uploading: false,
+
+    addFiles(event, source) {
+      this.source = source;
+      const newFiles = Array.from(event.target.files);
+      newFiles.forEach(f => {
+        if (f.size > 50 * 1024 * 1024) {
+          showToast(`${f.name} exceeds 50MB limit`, 'error');
+          return;
+        }
+        this.files.push(f);
+        const reader = new FileReader();
+        reader.onload = (e) => this.previews.push({ url: e.target.result, name: f.name });
+        reader.readAsDataURL(f);
+      });
+    },
+
+    removeFile(i) {
+      this.files.splice(i, 1);
+      this.previews.splice(i, 1);
+    },
+
+    async upload() {
+      if (!this.files.length) return;
+      this.uploading = true;
+
+      const form = new FormData();
+      this.files.forEach(f => form.append('files', f));
+      form.append('source', this.source);
+      form.append('description', this.description);
+
+      const consultationId = document.querySelector('[data-consultation-id]')?.dataset.consultationId
+        || window.location.pathname.match(/\/(\d+)\//)?.[1];
+
+      try {
+        const r = await fetch(`/api/v1/consultations/${consultationId}/upload/`, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCsrfToken() },
+          body: form,
+        });
+        const data = await r.json();
+        showToast(`✓ ${data.uploaded} file(s) uploaded`, 'success');
+        this.files = [];
+        this.previews = [];
+        this.description = '';
+        // Refresh attachments grid
+        htmx.ajax('GET', window.location.href, { target: '#attachments-list', swap: 'innerHTML' });
+      } catch (e) {
+        showToast('Upload failed — check connection', 'error');
+      } finally {
+        this.uploading = false;
+      }
+    },
+  };
+}
+</script>

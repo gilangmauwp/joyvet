@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html
+  lang="en"
+  x-data="{ darkMode: $store.theme.dark, sidebarOpen: window.innerWidth >= 1024 }"
+  :class="{ 'dark': darkMode }"
+  class="h-full"
+>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#14b8a6" />
+  <title>{% block title %}JoyVet Care{% endblock %} — {{ CLINIC_NAME }}</title>
+
+  <!-- Preconnect for fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS (CDN for dev; replace with compiled CSS in production) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['DM Sans', 'sans-serif'], mono: ['DM Mono', 'monospace'] },
+          colors: {
+            primary: { 50:'#f0fdf9',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a' },
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
+  <!-- Alpine.js -->
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <!-- jsQR (for QR scanner) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
+
+  <style>
+    [x-cloak] { display: none !important; }
+    body { font-family: 'DM Sans', sans-serif; }
+    code, .font-mono { font-family: 'DM Mono', monospace; }
+    /* HTMX loading indicator */
+    .htmx-indicator { opacity: 0; transition: opacity 0.2s; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 antialiased">
+
+<!-- Alpine global store setup -->
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.store('theme', {
+      dark: localStorage.getItem('darkMode') === 'true',
+      toggle() {
+        this.dark = !this.dark;
+        localStorage.setItem('darkMode', this.dark);
+      },
+    });
+    Alpine.store('toasts', {
+      items: [],
+      add(message, type = 'info') {
+        const id = Date.now();
+        this.items.push({ id, message, type });
+        setTimeout(() => this.remove(id), 4000);
+      },
+      remove(id) { this.items = this.items.filter(t => t.id !== id); },
+    });
+  });
+  // Toast helper callable from anywhere
+  function showToast(message, type = 'info') {
+    Alpine.store('toasts').add(message, type);
+  }
+</script>
+
+<div class="flex h-full">
+
+  {% if user.is_authenticated %}
+  <!-- ── Sidebar navigation ── -->
+  <aside
+    :class="sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'"
+    class="hidden lg:flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-200 flex-shrink-0"
+  >
+    <!-- Logo -->
+    <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-200 dark:border-slate-700">
+      <div class="w-9 h-9 bg-primary-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">JV</div>
+      <div>
+        <p class="font-semibold text-sm text-slate-900 dark:text-white">{{ CLINIC_NAME }}</p>
+        {% if user_branch %}
+        <p class="text-xs text-slate-500">{{ user_branch.name }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Nav links -->
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      {% include "components/nav_link.html" with href="/" icon="grid" label="Dashboard" %}
+      {% include "components/nav_link.html" with href="/patients/" icon="users" label="Patients" %}
+      {% include "components/nav_link.html" with href="/appointments/" icon="calendar" label="Appointments" %}
+      {% include "components/nav_link.html" with href="/inventory/" icon="package" label="Inventory" %}
+      {% include "components/nav_link.html" with href="/billing/" icon="credit-card" label="Billing / POS" %}
+      {% if can_view_financials %}
+      {% include "components/nav_link.html" with href="/reports/" icon="bar-chart-2" label="Reports" %}
+      {% endif %}
+      {% include "components/nav_link.html" with href="/admin/" icon="settings" label="Admin" %}
+    </nav>
+
+    <!-- User info -->
+    <div class="px-4 py-4 border-t border-slate-200 dark:border-slate-700">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center text-primary-700 dark:text-primary-300 font-medium text-sm">
+          {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">{{ user.get_full_name }}</p>
+          {% if staff_profile %}
+          <p class="text-xs text-slate-500 truncate">{{ staff_profile.get_role_display }}</p>
+          {% endif %}
+        </div>
+        <a href="/accounts/logout/" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs">
+          Out
+        </a>
+      </div>
+    </div>
+  </aside>
+  {% endif %}
+
+  <!-- ── Main content area ── -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+    {% if user.is_authenticated %}
+    <!-- Top bar -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-4 z-10">
+      <!-- Mobile menu toggle -->
+      <button
+        @click="sidebarOpen = !sidebarOpen"
+        class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+
+      <!-- Global search -->
+      <div class="flex-1 max-w-xl" x-data="globalSearch()">
+        <div class="relative">
+          <input
+            type="text"
+            placeholder="Search patient, owner, phone, microchip..."
+            x-model="query"
+            @input.debounce.300ms="search()"
+            @keydown.escape="close()"
+            class="w-full pl-9 pr-4 py-2 text-sm bg-slate-100 dark:bg-slate-700 border-0 rounded-xl focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-600 transition-colors"
+          />
+          <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+        <!-- Search results dropdown -->
+        <div
+          x-show="results.length > 0"
+          x-cloak
+          @click.outside="close()"
+          class="absolute mt-1 w-full max-w-xl bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
+        >
+          <template x-for="r in results" :key="r.id">
+            <a
+              :href="`/patients/${r.id}/`"
+              class="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-700 last:border-0"
+            >
+              <span x-text="r.species_emoji" class="text-xl"></span>
+              <div>
+                <p class="text-sm font-medium" x-text="r.name"></p>
+                <p class="text-xs text-slate-500" x-text="`${r.owner_name} · ${r.owner_phone}`"></p>
+              </div>
+            </a>
+          </template>
+        </div>
+      </div>
+
+      <!-- Right controls -->
+      <div class="flex items-center gap-2 ml-auto">
+        <!-- Low stock badge -->
+        {% if low_stock_count > 0 %}
+        <a href="/inventory/?tab=alerts" class="relative p-2">
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+          <span id="stock-alert-badge"
+                class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-mono">
+            {{ low_stock_count }}
+          </span>
+        </a>
+        {% endif %}
+
+        <!-- Dark mode toggle -->
+        <button
+          @click="$store.theme.toggle(); darkMode = $store.theme.dark"
+          class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500"
+          :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+        >
+          <span x-show="!darkMode">🌙</span>
+          <span x-show="darkMode" x-cloak>☀️</span>
+        </button>
+
+        <!-- WS connection indicator -->
+        {% include "components/ws_client.html" %}
+      </div>
+    </header>
+    {% endif %}
+
+    <!-- Page content -->
+    <main id="main-content" class="flex-1 overflow-y-auto p-4 lg:p-6">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Mobile bottom tab bar -->
+    {% if user.is_authenticated %}
+    <nav class="lg:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex z-20">
+      <a href="/" class="flex-1 flex flex-col items-center py-2 text-xs text-slate-500">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Home
+      </a>
+      <a href="/patients/" class="flex-1 flex flex-col items-center py-2 text-xs text-slate-500">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Patients
+      </a>
+      <a href="/inventory/" class="flex-1 flex flex-col items-center py-2 text-xs text-slate-500">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
+        Stock
+      </a>
+    </nav>
+    <div class="lg:hidden h-16"></div><!-- bottom nav spacer -->
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Toast notifications ── -->
+<div
+  x-data
+  class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
+>
+  <template x-for="toast in $store.toasts.items" :key="toast.id">
+    <div
+      x-show="true"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 translate-x-4"
+      x-transition:enter-end="opacity-100 translate-x-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-end="opacity-0 translate-x-4"
+      :class="{
+        'bg-green-50 border-green-400 text-green-800': toast.type === 'success',
+        'bg-amber-50 border-amber-400 text-amber-800':  toast.type === 'warning',
+        'bg-red-50 border-red-400 text-red-800':        toast.type === 'error',
+        'bg-blue-50 border-blue-400 text-blue-800':     toast.type === 'info',
+      }"
+      class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg text-sm max-w-sm"
+    >
+      <span x-text="toast.message" class="flex-1"></span>
+      <button @click="$store.toasts.remove(toast.id)" class="opacity-60 hover:opacity-100">&times;</button>
+    </div>
+  </template>
+</div>
+
+<!-- ── JS: Global search Alpine component ── -->
+<script>
+function globalSearch() {
+  return {
+    query: '', results: [],
+    async search() {
+      if (this.query.length < 2) { this.results = []; return; }
+      const r = await fetch(`/api/v1/search/?q=${encodeURIComponent(this.query)}`,
+        { headers: { 'X-CSRFToken': getCsrfToken() } });
+      const data = await r.json();
+      this.results = data.results || [];
+    },
+    close() { this.results = []; this.query = ''; },
+  };
+}
+
+function getCsrfToken() {
+  return document.cookie.split('; ')
+    .find(row => row.startsWith('csrftoken='))?.split('=')[1] ?? '';
+}
+
+// HTMX CSRF header
+document.addEventListener('htmx:configRequest', e => {
+  e.detail.headers['X-CSRFToken'] = getCsrfToken();
+});
+</script>
+
+{% block extra_js %}{% endblock %}
+
+<!-- Service Worker registration -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js')
+    .catch(e => console.warn('SW registration failed', e));
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,20 @@
+<div class="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 aspect-square bg-slate-100 dark:bg-slate-800">
+  {% if attachment.file_type == 'PHOTO' %}
+  <img src="{{ attachment.file.url }}" class="w-full h-full object-cover" alt="{{ attachment.description }}"/>
+  {% elif attachment.file_type == 'VIDEO' %}
+  <div class="flex items-center justify-center h-full text-4xl">🎥</div>
+  {% elif attachment.file_type == 'LAB' %}
+  <div class="flex items-center justify-center h-full text-4xl">🔬</div>
+  {% elif attachment.file_type == 'XRAY' %}
+  <div class="flex items-center justify-center h-full text-4xl">🩻</div>
+  {% else %}
+  <div class="flex items-center justify-center h-full text-4xl">📄</div>
+  {% endif %}
+  <!-- Hover overlay -->
+  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+    <a href="{{ attachment.file.url }}" target="_blank"
+       class="text-white text-xs font-medium px-2 py-1 bg-black/50 rounded-lg">
+      View →
+    </a>
+  </div>
+</div>

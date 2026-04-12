@@ -1,0 +1,132 @@
+version: '3.9'
+
+# ──────────────────────────────────────────────
+# JoyVet Care — Docker Compose (LAN deployment)
+# All services run on clinic server, accessed via 192.168.x.x
+# ──────────────────────────────────────────────
+
+x-app-env: &app-env
+  DJANGO_SETTINGS_MODULE: joyvet.settings.local
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_NAME: ${DB_NAME:-joyvet}
+  DB_USER: ${DB_USER:-joyvet}
+  DB_PASSWORD: ${DB_PASSWORD:-joyvetpass}
+  REDIS_URL: redis://redis:6379/0
+
+x-app-volumes: &app-volumes
+  - .:/app
+  - media_vol:/app/media
+  - static_vol:/app/staticfiles
+
+services:
+  # ── PostgreSQL 16 ──────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-joyvet}
+      POSTGRES_USER: ${DB_USER:-joyvet}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-joyvetpass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-joyvet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - joyvet_net
+
+  # ── Redis 7 (broker + cache + channels) ───
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - joyvet_net
+
+  # ── Django / Daphne (ASGI) ─────────────────
+  app:
+    build: .
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 joyvet.asgi:application"
+    environment:
+      <<: *app-env
+    env_file:
+      - .env
+    volumes: *app-volumes
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - joyvet_net
+
+  # ── Celery Worker ──────────────────────────
+  celery:
+    build: .
+    restart: unless-stopped
+    command: celery -A joyvet worker --loglevel=info --concurrency=4 -Q default,reminders,reports
+    environment:
+      <<: *app-env
+    env_file:
+      - .env
+    volumes: *app-volumes
+    depends_on:
+      - app
+    networks:
+      - joyvet_net
+
+  # ── Celery Beat (scheduler) ────────────────
+  celery-beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A joyvet beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      <<: *app-env
+    env_file:
+      - .env
+    volumes: *app-volumes
+    depends_on:
+      - app
+    networks:
+      - joyvet_net
+
+  # ── Nginx (reverse proxy + SSL) ───────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - static_vol:/var/www/static:ro
+      - media_vol:/var/www/media:ro
+    depends_on:
+      - app
+    networks:
+      - joyvet_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_vol:
+  static_vol:
+
+networks:
+  joyvet_net:
+    driver: bridge
