@@ -27,8 +27,11 @@ LOGGING = {
 # Run Celery tasks synchronously in tests when needed
 # CELERY_TASK_ALWAYS_EAGER = True
 
-# Use a separate Redis DB for dev cache
-CACHES['default']['LOCATION'] = 'redis://localhost:6379/2'  # noqa: F405
+# Use Redis from environment (works both locally and inside Docker)
+import os  # noqa: E402
+_redis_base = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+_redis_host = _redis_base.rsplit('/', 1)[0]  # strip DB index
+CACHES['default']['LOCATION'] = f'{_redis_host}/2'  # noqa: F405
 
 # Whitenoise for static during dev
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'

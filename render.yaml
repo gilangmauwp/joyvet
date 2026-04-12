@@ -1,0 +1,32 @@
+services:
+  # ── Web application ─────────────────────────────────────────
+  - type: web
+    name: joyvet
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "daphne -b 0.0.0.0 -p $PORT joyvet.asgi:application"
+    plan: free
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: joyvet.settings.production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CLINIC_NAME
+        value: JoyVet Care
+      - key: INVOICE_PREFIX
+        value: INV
+      - key: DATABASE_URL
+        fromDatabase:
+          name: joyvet-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: localhost
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+
+  # ── PostgreSQL database ─────────────────────────────────────
+databases:
+  - name: joyvet-db
+    plan: free
+    databaseName: joyvet
+    user: joyvet
