@@ -70,6 +70,32 @@ class StaffProfile(models.Model):
         return self.user.get_full_name()
 
 
+class CdsCase(models.Model):
+    """
+    Clinical case record synced from JoyVet CDS (offline HTML tool).
+    Auth via clinic_key query param — no JWT needed, works from file:// protocol.
+    """
+    clinic_key = models.CharField(
+        max_length=36, db_index=True,
+        help_text="UUID shared by all staff at this clinic",
+    )
+    case_id = models.BigIntegerField(
+        help_text="Timestamp-based ID from the CDS tool",
+    )
+    data = models.JSONField(help_text="Full CDS case object")
+    saved_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-saved_at']
+        unique_together = [('clinic_key', 'case_id')]
+        verbose_name = 'CDS Case'
+        verbose_name_plural = 'CDS Cases'
+
+    def __str__(self) -> str:
+        name = self.data.get('patientName', 'Unknown') if self.data else 'Unknown'
+        return f"CDS #{self.case_id} — {name}"
+
+
 class AuditLog(models.Model):
     """
     Immutable audit trail — NEVER delete these records.

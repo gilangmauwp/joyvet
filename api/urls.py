@@ -16,6 +16,7 @@ from apps.analytics.views import (
     RevenueReportView, InventoryForecastView, DashboardStatsView
 )
 from frontend.views import GlobalSearchView, MediaAuthView
+from apps.core.cds_views import CdsCaseListView, CdsCaseDetailView
 
 router = DefaultRouter()
 router.register(r'clients', ClientViewSet, basename='client')
@@ -47,6 +48,10 @@ urlpatterns = [
     path('reports/revenue/', RevenueReportView.as_view(), name='revenue_report'),
     path('reports/dashboard/', DashboardStatsView.as_view(), name='dashboard_stats'),
     path('inventory/forecast/', InventoryForecastView.as_view(), name='inventory_forecast'),
+
+    # CDS offline tool sync (key-based auth, CORS-safe from file://)
+    path('cds/cases/', CdsCaseListView.as_view(), name='cds_cases'),
+    path('cds/cases/<int:case_id>/', CdsCaseDetailView.as_view(), name='cds_case_detail'),
 
     # ViewSet routes
     path('', include(router.urls)),

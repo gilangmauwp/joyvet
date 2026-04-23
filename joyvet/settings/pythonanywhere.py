@@ -56,6 +56,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
+# ── CORS — allow JoyVet CDS (file:// origin = "null") ──────────────────────
+CORS_ALLOW_ALL_ORIGINS = True
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
