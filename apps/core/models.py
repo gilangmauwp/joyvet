@@ -83,6 +83,7 @@ class CdsCase(models.Model):
         help_text="Timestamp-based ID from the CDS tool",
     )
     data = models.JSONField(help_text="Full CDS case object")
+    html_content = models.TextField(blank=True, default='', help_text='Printable HTML record')
     saved_at = models.DateTimeField(auto_now=True)
 
     class Meta:

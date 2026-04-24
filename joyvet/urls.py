@@ -11,6 +11,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
+from apps.core.cds_views import CdsRecordsBrowserView
 
 admin.site.site_header = 'JoyVet Care — Admin'
 admin.site.site_title = 'JoyVet Care'
@@ -25,6 +26,9 @@ urlpatterns = [
 
     # REST API
     path('api/v1/', include('api.urls')),
+
+    # Medical records browser (humans, not API)
+    path('records/', CdsRecordsBrowserView.as_view(), name='cds_records'),
 
     # WebSocket routes are handled by ASGI router in joyvet/asgi.py
     # (no HTTP URL needed)
